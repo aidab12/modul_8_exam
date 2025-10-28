@@ -11,6 +11,8 @@ from apps.models.users import User
 
 
 class SignUpSerializer(ModelSerializer):
+    phone = CharField(default='991884040')
+
     class Meta:
         model = User
         fields = (
@@ -36,7 +38,8 @@ class SignUpSerializer(ModelSerializer):
             phone=validated_data['phone'],
             password=validated_data['password'],
             first_name=validated_data['first_name'],
-            last_name=validated_data['last_name']
+            last_name=validated_data['last_name'],
+            is_active=False
         )
         return user
 
@@ -48,7 +51,7 @@ class SignUpSerializer(ModelSerializer):
                 "last_name": instance.last_name,
                 "phone": instance.phone,
             },
-            "message": "Registration successful."
+            "message": "Registration successful. Please verify your phone."
         }
 
 
@@ -63,13 +66,6 @@ class SendSmsCodeSerializer(Serializer):
         phone = ''.join(digits)
         return phone.removeprefix('998')
 
-    def validate(self, attrs):
-        phone = attrs['phone']
-        user, created = User.objects.get_or_create(phone=phone)
-        user.set_unusable_password()
-
-        return super().validate(attrs)
-
 
 class UserModelSerializer(ModelSerializer):
     class Meta:
@@ -78,12 +74,13 @@ class UserModelSerializer(ModelSerializer):
 
 
 class VerifySmsCodeSerializer(Serializer):
-    phone = CharField(default='971884040')
+    phone = CharField(default='991884040')
     code = IntegerField(default=100000)
     token_class = RefreshToken
 
     default_error_messages = {
-        "no_active_account": "No active account found with the given credentials"
+        "no_active_account": "No active account found with the given credentials",
+        "invalid_code": "Invalid verification code"
     }
 
     def validate_phone(self, value):
@@ -94,12 +91,18 @@ class VerifySmsCodeSerializer(Serializer):
         return phone.removeprefix('998')
 
     def validate(self, attrs: dict[str, Any]):
-        self.user = authenticate(phone=attrs['phone'], request=self.context['request'])
-
-        if self.user is None:
+        try:
+            self.user = User.objects.get(phone=attrs['phone'])
+        except User.DoesNotExist:
             raise ValidationError(self.default_error_messages['no_active_account'])
 
         return attrs
+
+    def activate_user(self):
+        """Активирует пользователя после успешной верификации"""
+        if not self.user.is_active:
+            self.user.is_active = True
+            self.user.save(update_fields=['is_active'])
 
     @property
     def get_data(self):
@@ -111,7 +114,7 @@ class VerifySmsCodeSerializer(Serializer):
         user_data = UserModelSerializer(self.user).data
 
         return {
-            'message': "OK",
+            'message': "Account activated successfully",
             'data': {
                 **data, **{'user': user_data}
             }

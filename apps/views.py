@@ -21,9 +21,30 @@ class SignUpAPIView(CreateAPIView):
     serializer_class = SignUpSerializer
     permission_classes = AllowAny,
 
+    def post(self, request, *args, **kwargs):
 
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        code = random_code()
+        phone = user.phone
+        send_sms_code(phone, code)
+
+        return Response(
+            serializer.to_representation(user),
+            status=status.HTTP_201_CREATED
+        )
+
+@extend_schema_view(
+    post=extend_schema(
+        summary='Отправка SMS кода',
+        tags=['Аутентификация/Авторизация']
+    )
+)
 class SendCodeAPIView(APIView):
     serializer_class = SendSmsCodeSerializer
+    permission_classes = (AllowAny,)
 
     def post(self, request, *args, **kwargs):
         serializer = SendSmsCodeSerializer(data=request.data)
@@ -34,15 +55,32 @@ class SendCodeAPIView(APIView):
         return Response({"message": "send sms code"})
 
 
-class LoginAPIView(APIView):
+@extend_schema_view(
+    post=extend_schema(
+        summary='Подтверждение кода и активация аккаунта',
+        tags=['Аутентификация/Авторизация']
+    )
+)
+class VerifyCodeAPIView(APIView):
     serializer_class = VerifySmsCodeSerializer
+    permission_classes = AllowAny,
 
     def post(self, request, *args, **kwargs):
         serializer = VerifySmsCodeSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
-        is_valid_code = check_sms_code(**serializer.data)
-        if not is_valid_code:
-            return Response({"message": "invalid code"}, status.HTTP_400_BAD_REQUEST)
+        is_valid_code = check_sms_code(
+            phone=serializer.validated_data['phone'],
+            code=serializer.validated_data['code']
+        )
 
-        return Response(serializer.get_data)
+        if not is_valid_code:
+            return Response(
+                {"message": "Invalid verification code"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+        serializer.activate_user()
+
+        return Response(serializer.get_data, status=status.HTTP_200_OK)

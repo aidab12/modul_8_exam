@@ -6,13 +6,13 @@ from rest_framework_simplejwt.views import (
 )
 
 from apps.views import (
-    LoginAPIView, SendCodeAPIView, VerifySmsCodeSerializer, SignUpAPIView
+    SignUpAPIView, VerifyCodeAPIView
 )
 
 urlpatterns = [
     path('auth/register', SignUpAPIView.as_view(), name='register'),
-    path('auth/send-code', SendCodeAPIView.as_view(), name='token_obtain_pair'),
-    path('auth/verify-code', LoginAPIView.as_view(), name='token_obtain_pair'),
+
+    path('auth/verify-code', VerifyCodeAPIView.as_view(), name='token_obtain_pair'),
     path('auth/refresh-token', TokenRefreshView.as_view(), name='token_refresh'),
     # path('login', LoginAPIView.as_view(), name='register'),
     # path('confirm-sms', VerifySmsCodeSerializer, name='register'),

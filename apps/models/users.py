@@ -1,8 +1,8 @@
 import re
 
 from django.contrib.auth.models import AbstractUser
-from django.db.models import CharField, TextChoices, BooleanField
 from django.core.exceptions import ValidationError
+from django.db.models import CharField, TextChoices
 
 from apps.models.base import UUIDBaseModel
 from apps.models.managers import CustomUserManager
